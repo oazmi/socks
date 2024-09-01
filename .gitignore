@@ -15,6 +15,9 @@
 /src/readme.md
 /src/license.md
 
+# built files
+/examples/**/*.js
+
 # build scripts (TODO: temporary, until `@oazmi/build-tools` is not finallized)
 /build_dist.ts
 /build_tools.ts

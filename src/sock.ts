@@ -34,14 +34,17 @@ export class Sock<B extends ArrayBuffer | Blob = Blob> {
 				jsonReceivers[message.kind](this, message)
 			} else {
 				const kind = this.binaryReceiverNextKind as string
-				this.binaryReceiverNextKind = undefined
+				// I had originally planned that every binary received data must be accompannied by a json prior to it.
+				// although it would have been a good design, I don't think I want the communication to be that verbose.
+				// thus we will continue to hold on to the most recent binary kind.
+				// this.binaryReceiverNextKind = undefined // set the binary kind to undefined, to ensure that the user manually set the next kind based on received json messages
 				binaryReceivers[kind](this, data)
 			}
 		})
 	}
 
 	/** send an object as a json encoded message. */
-	sendJson(message: SockJsonMessage) {
+	sendJson<M extends SockJsonMessage>(message: M) {
 		this.socket.send(JSON.stringify(message))
 	}
 
@@ -65,6 +68,11 @@ export class Sock<B extends ArrayBuffer | Blob = Blob> {
 	/** set the `kind` of upcoming binary data messages received, so that they are routed to the correct handler function in {@link binaryReceivers}. */
 	expectBinaryKind(kind: string) {
 		this.binaryReceiverNextKind = kind
+	}
+
+	/** get the current expectation `kind` of upcoming received binary data messages. */
+	getBinaryKind() {
+		return this.binaryReceiverNextKind
 	}
 
 	/** a static method to create a {@link Sock} (websocket wrapper) that has its connection established (i.e. `websocket.readyState === websocket.OPEN`),
