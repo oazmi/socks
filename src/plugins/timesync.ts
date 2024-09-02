@@ -2,11 +2,11 @@
  * 
  * ## Requirements
  * 
- * The following names for {@link SockJsonMessage.kind | json message `kind`} is reserved for this plugin:
+ * The following names for {@link SockJsonMessage.kind | json message `kind`} are reserved for this plugin:
  * - `"timesync_init"`
  * - `"timesync_end"`
  * 
- * The following names for binary messages `kind` is reserved for this plugin:
+ * The following names for binary messages `kind` are reserved for this plugin:
  * - `"timesync_array"`
  * 
  * 
@@ -80,6 +80,7 @@ import type { Sock } from "../sock.ts"
 import type { SockJsonMessage } from "../typedefs.ts"
 import { pow, sub, sum, transpose2D } from "./deps.ts"
 
+
 const
 	plugin_json_kind_init = "timesync_init" as const,
 	plugin_json_kind_end = "timesync_end" as const,
@@ -108,19 +109,31 @@ export interface EndTimesyncTests_JsonMessage extends SockJsonMessage {
 	kind: typeof plugin_json_kind_end
 }
 
-export type TimesyncStats = [
-	values: [
-		serverUplinkOffsetTime: number,
-		serverDownlinkOffsetTime: number,
-		serverProcessTime: number,
-		returnTripTime: number,
-	], standardDeviations: [
-		serverUplinkOffsetTime: number,
-		serverDownlinkOffsetTime: number,
-		serverProcessTime: number,
-		returnTripTime: number,
-	]
+type TimesyncStat = [
+	serverUplinkOffsetTime: number,
+	serverDownlinkOffsetTime: number,
+	serverProcessTime: number,
+	returnTripTime: number,
 ]
+
+export type TimesyncStats = [
+	meanValues: TimesyncStat,
+	standardDeviations: TimesyncStat,
+]
+
+/** a function that returns a server-time synchronized clock for the client, along with its uncertainty parameters.
+ * 
+ * the higher `amount` of tests that you perform the more precise results you will get, so long as it does not exceed a large quantity,
+ * like `50`, which will probably cause your network adapters (whether internal, external, or on the server side) to throttle the speed
+ * at which your messages are sent at.
+ * `10` to `20` usually gives very precise and accurate results.
+ * 
+ * moreover, discarding the first few results is also a good idea, since network routing is initially slower,
+ * but becomes faster the more the socket is utilized.
+ * I recommend discarding the first `20%` to `30%` number of results.
+ * so pick like `3` discards for `10` tests, and `5` discards for `20` tests.
+*/
+export type TimesyncFn = (amount: number, discard?: number) => Promise<TimesyncStats>
 
 const time_array_to_stat = (time_array: [ct0: number, st0: number, st1: number, ct1: number] | Float64Array) => {
 	const
@@ -144,7 +157,7 @@ const time_arrays_to_stats = (time_arrays: Array<Float64Array>): TimesyncStats =
 	return [mean_stats as any, stdev_stats as any]
 }
 
-const parse_time_fn = (time_fn: TimeFunction): (() => number) => {
+export const parseTimeFn = (time_fn: TimeFunction): (() => number) => {
 	return time_fn === "date"
 		? Date.now
 		: time_fn === "perf"
@@ -153,7 +166,7 @@ const parse_time_fn = (time_fn: TimeFunction): (() => number) => {
 }
 
 export const applyServerPlugin = (sock: Sock<ArrayBuffer>, time_fn: TimeFunction = "perf"): void => {
-	const get_time = parse_time_fn(time_fn)
+	const get_time = parseTimeFn(time_fn)
 	let original_binary_kind: string
 
 	sock.addJsonReceiver(plugin_json_kind_init, (websock, message: InitTimesyncTests_JsonMessage) => {
@@ -181,9 +194,9 @@ export const applyServerPlugin = (sock: Sock<ArrayBuffer>, time_fn: TimeFunction
 export const applyClientPlugin = (
 	sock: Sock<ArrayBuffer>,
 	time_fn: TimeFunction = "perf"
-): ((amount: number, discard?: number) => Promise<TimesyncStats>) => {
+): TimesyncFn => {
 	const
-		get_time = parse_time_fn(time_fn),
+		get_time = parseTimeFn(time_fn),
 		results: Array<Float64Array> = []
 	let
 		original_binary_kind: string,

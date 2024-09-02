@@ -38,6 +38,9 @@ export class Sock<B extends ArrayBuffer | Blob = Blob> {
 				// although it would have been a good design, I don't think I want the communication to be that verbose.
 				// thus we will continue to hold on to the most recent binary kind.
 				// this.binaryReceiverNextKind = undefined // set the binary kind to undefined, to ensure that the user manually set the next kind based on received json messages
+				
+				// TODO: implement a stack of binary `kind`s, so that the end user can simply push a new state when they wish to process a certain kind of binary data,
+				//       and at the end, they can pop the state once they are done with that specific form of communication.
 				binaryReceivers[kind](this, data)
 			}
 		})
