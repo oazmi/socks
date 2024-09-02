@@ -1,1 +1,1 @@
-export const urlPathname = "/timesync"
+export const urlPathname = "/speedtest"
