@@ -1,4 +1,4 @@
-import { applyClientPlugin as speedtest_applyClientPlugin } from "../../src/plugins/speedtest.ts"
+import { applyClientPlugin as speedtest_applyClientPlugin, summarizeSpeedtestStats } from "../../src/plugins/speedtest.ts"
 import { applyClientPlugin as timesync_applyClientPlugin } from "../../src/plugins/timesync.ts"
 import { Sock } from "../../src/sock.ts"
 import { urlPathname } from "./deps.ts"
@@ -27,8 +27,13 @@ const
 		})
 	},
 	run_get_speedtest = () => {
-		get_speedtest(4 * 1024 ** 2, 4 * 1024 ** 2).then((stats) => {
-			printJsonToWebpage(speedtestStatFormatter(stats))
+		get_speedtest([
+			["down", 2 * 1024 ** 2],
+			["down", 2 * 1024 ** 2],
+			["up", 2 * 1024 ** 2],
+			["up", 2 * 1024 ** 2],
+		]).then((stats) => {
+			printJsonToWebpage(speedtestStatFormatter(summarizeSpeedtestStats(stats)))
 		})
 	}
 

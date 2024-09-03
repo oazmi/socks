@@ -1,11 +1,11 @@
 /** dependencies of the client code. */
 
-import type { LinkStats } from "../../src/plugins/speedtest.ts"
+import type { SpeedtestStats } from "../../src/plugins/speedtest.ts"
 import type { TimesyncStats } from "../../src/plugins/timesync.ts"
 
-const number_formatter = (value: number) => {
-	return value.toFixed(3)
-}
+const
+	number_formatter = (value: number) => (value.toFixed(3)),
+	bytes_per_sec_to_mbps = (value: number) => (8 * value / (1024 ** 2))
 
 export const
 	domainName = globalThis.location?.host as string,
@@ -21,15 +21,18 @@ export const
 			returnTripTime: `${means_str[3]} ± ${stdevs_str[3]} ms`,
 		}
 	},
-	speedtestStatFormatter = (stats: LinkStats) => {
-		const [
-			[downlink_size, downlink_delta_time],
-			[uplink_size, uplink_delta_time],
-		] = stats,
-			downlink_mbps = (8 * downlink_size / (1024 ** 2)) / (downlink_delta_time * 10 ** (-3)),
-			uplink_mbps = (8 * uplink_size / (1024 ** 2)) / (uplink_delta_time * 10 ** (-3))
+	speedtestStatFormatter = (stats: SpeedtestStats) => {
+		const {
+			downlinkSpeed: { value: dl, error: dl_stdev },
+			uplinkSpeed: { value: ul, error: ul_stdev },
+		} = stats
+		const
+			dl_mbps = number_formatter(bytes_per_sec_to_mbps(dl)),
+			dl_stdev_mbps = number_formatter(bytes_per_sec_to_mbps(dl_stdev)),
+			ul_mbps = number_formatter(bytes_per_sec_to_mbps(ul)),
+			ul_stdev_mbps = number_formatter(bytes_per_sec_to_mbps(ul_stdev))
 		return {
-			downlinkSpeed: `${number_formatter(downlink_mbps)} Mbps`,
-			uplinkSpeed: `${number_formatter(uplink_mbps)} Mbps`,
+			downlinkSpeed: `${dl_mbps} ± ${dl_stdev_mbps} Mbps`,
+			uplinkSpeed: `${ul_mbps} ± ${ul_stdev_mbps} Mbps`,
 		}
 	}
