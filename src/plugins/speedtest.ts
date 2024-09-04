@@ -32,6 +32,7 @@ import type { SockJsonMessage } from "../typedefs.ts"
 import { computeMean, max, type UncertainValue } from "./deps.ts"
 import {
 	parseTimeFn,
+	summarizeTimesyncStats,
 	type TimeFunction,
 	type applyClientPlugin as timesync_applyClientPlugin,
 	type applyServerPlugin as timesync_applyServerPlugin,
@@ -62,7 +63,7 @@ const
 	CS_binary_data_up = "speedtest_binary_data_up" as const,
 	/** the timing stats of the uplink test are sent by the server to the client. see {@link CS_StatUp} for the message interface. */
 	SC_json_stat_up = "speedtest_stat_up" as const,
-	/** the message sent by the client to the server to specify end of speedtesting. see {@link SC_InitReady} for the message interface. */
+	/** the message sent by the client to the server to specify end of speedtesting. see {@link CS_End} for the message interface. */
 	CS_json_end = "speedtest_end" as const
 
 
@@ -155,13 +156,14 @@ export const applyClientPlugin = (
 	time_fn: TimeFunction = "perf",
 	timsync_fn: TimesyncFn,
 ): ((test_pattern: SpeedtestPattern) => Promise<SpeedtestResults>) => {
-	const get_time = parseTimeFn(time_fn)
+	const
+		get_time = parseTimeFn(time_fn),
+		results: SpeedtestResults = []
 	let
 		original_binary_kind: string,
 		executeNextTest: Generator<void, void, void>,
-		serverUplinkOffsetTime: number,
-		serverDownlinkOffsetTime: number,
-		results: SpeedtestResults = []
+		server_up_offset_time: number,
+		server_down_offset_time: number
 
 	sock.addJsonReceiver(SC_json_init_ready, (websock, message: SC_InitReady) => {
 		executeNextTest.next()
@@ -170,7 +172,7 @@ export const applyClientPlugin = (
 	sock.addJsonReceiver(SC_json_stat_up, (websock, message: SC_StatUp) => {
 		const
 			{ size, time: [client_sent_time, server_receive_time] } = message,
-			sent_time_wrt_server = client_sent_time + serverUplinkOffsetTime,
+			sent_time_wrt_server = client_sent_time + server_up_offset_time,
 			delta_time = server_receive_time - sent_time_wrt_server
 		results.push({ mode: "up", size, time: delta_time })
 		executeNextTest.next()
@@ -181,7 +183,7 @@ export const applyClientPlugin = (
 			client_receive_time = get_time(),
 			size = data.byteLength,
 			server_sent_time = (new Float64Array(data, 0, 1))[0], // convert the first 8 bytes to a 64-bit float to get the server's timestamp.
-			receive_time_wrt_server = client_receive_time - serverDownlinkOffsetTime,
+			receive_time_wrt_server = client_receive_time - server_down_offset_time,
 			delta_time = receive_time_wrt_server - server_sent_time
 		results.push({ mode: "down", size, time: delta_time })
 		executeNextTest.next()
@@ -189,9 +191,11 @@ export const applyClientPlugin = (
 
 	return async (test_pattern: SpeedtestPattern): Promise<SpeedtestResults> => {
 		// perform pings to attain a server synchronized clock
-		[[serverUplinkOffsetTime, serverDownlinkOffsetTime]] = await timsync_fn(10, 3)
+		({
+			serverUplinkOffsetTime: { value: server_up_offset_time },
+			serverDownlinkOffsetTime: { value: server_down_offset_time },
+		} = summarizeTimesyncStats((await timsync_fn(10)).slice(3)))
 
-		results = []
 		const [results_promise, results_resolver, results_rejector] = promise_outside<SpeedtestResults>()
 		sock.expectBinaryKind(SC_binary_data_down)
 
@@ -209,7 +213,7 @@ export const applyClientPlugin = (
 				}
 			}
 			sock.expectBinaryKind(original_binary_kind)
-			results_resolver(results)
+			results_resolver(results.splice(0)) // we need to clone the results, so that we can clear up the local variable named `results` for future tests.
 			return
 		})()
 
