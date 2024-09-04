@@ -1,4 +1,4 @@
-import { applyClientPlugin } from "../../src/plugins/timesync.ts"
+import { applyClientPlugin, summarizeTimesyncStats } from "../../src/plugins/timesync.ts"
 import { Sock } from "../../src/sock.ts"
 import { urlPathname } from "./deps.ts"
 import { domainName, timesyncStatFormatter } from "./deps_client.ts"
@@ -20,7 +20,9 @@ const
 const
 	get_server_time = applyClientPlugin(client_sock, "perf"),
 	run_get_server_time = () => {
-		get_server_time(20, 5).then((stats) => {
+		get_server_time(20).then((results) => {
+			results.splice(0, 5)
+			const stats = summarizeTimesyncStats(results)
 			printJsonToWebpage(timesyncStatFormatter(stats))
 		})
 	}

@@ -1,5 +1,5 @@
 import { applyClientPlugin as speedtest_applyClientPlugin, summarizeSpeedtestStats } from "../../src/plugins/speedtest.ts"
-import { applyClientPlugin as timesync_applyClientPlugin } from "../../src/plugins/timesync.ts"
+import { summarizeTimesyncStats, applyClientPlugin as timesync_applyClientPlugin } from "../../src/plugins/timesync.ts"
 import { Sock } from "../../src/sock.ts"
 import { urlPathname } from "./deps.ts"
 import { domainName, speedtestStatFormatter, timesyncStatFormatter } from "./deps_client.ts"
@@ -22,7 +22,9 @@ const
 	get_server_time = timesync_applyClientPlugin(client_sock, "perf"),
 	get_speedtest = speedtest_applyClientPlugin(client_sock, "perf", get_server_time),
 	run_get_server_time = () => {
-		get_server_time(20, 5).then((stats) => {
+		get_server_time(20).then((results) => {
+			results.splice(0, 5)
+			const stats = summarizeTimesyncStats(results)
 			printJsonToWebpage(timesyncStatFormatter(stats))
 		})
 	},
@@ -32,8 +34,9 @@ const
 			["down", 2 * 1024 ** 2],
 			["up", 2 * 1024 ** 2],
 			["up", 2 * 1024 ** 2],
-		]).then((stats) => {
-			printJsonToWebpage(speedtestStatFormatter(summarizeSpeedtestStats(stats)))
+		]).then((results) => {
+			const stats = summarizeSpeedtestStats(results)
+			printJsonToWebpage(speedtestStatFormatter(stats))
 		})
 	}
 
